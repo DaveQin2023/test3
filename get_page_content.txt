@@ -1,0 +1,28 @@
+@mcp.tool()
+def get_page_content(page_id: str) -> str:
+    """Get the content of a specific Confluence page by page ID."""
+    url = f"{CONFLUENCE_BASE_URL}/content/{page_id}"
+    params = {
+        "expand": "body.storage,version,space,metadata.labels"
+    }
+
+    print(f"[DEBUG] Fetching page content for ID: {page_id}")
+    data = make_confluence_request(url, params=params)
+    if isinstance(data, str):
+        return data  # It's an error message
+
+    title = data.get("title", "Unknown")
+    space = data.get("space", {}).get("name", "Unknown")
+    version = data.get("version", {}).get("number", "Unknown")
+    content = data.get("body", {}).get("storage", {}).get("value", "No content")
+    labels = [label.get("name") for label in data.get("metadata", {}).get("labels", {}).get("results", [])]
+
+    return f"""
+Title: {title}
+Space: {space}
+Version: {version}
+Labels: {', '.join(labels) if labels else 'No labels'}
+
+Content:
+{content}
+""".strip()
