@@ -1,0 +1,35 @@
+@mcp.tool()
+def search_page(query: str, limit: Optional[int] = 5) -> str:
+    cql = f'text ~ "{query}" order by lastmodified desc'
+    url = f"{CONFLUENCE_BASE_URL}/content/search"
+    params = {
+        "cql": cql,
+        "limit": limit,
+        "expand": "space"
+    }
+
+    data = make_confluence_request(url, params=params)
+    if isinstance(data, str):
+        return data
+
+    results = data.get("results", [])
+    if not results:
+        return "No matching pages found."
+
+    output = []
+    for page in results:
+        title = page.get("title", "Untitled")
+        page_id = page.get("id", "Unknown")
+        space_key = page.get("space", {}).get("key", "Unknown")
+        last_modified = page.get("version", {}).get("when", "Unknown")
+        page_url = f"{CONFLUENCE_BASE_URL}/pages/viewpage.action?pageId={page_id}"
+
+        output.append(
+            f"Title: {title}\n"
+            f"Page ID: {page_id}\n"
+            f"Space: {space_key}\n"
+            f"Last Modified: {last_modified}\n"
+            f"Link: {page_url}\n"
+        )
+
+    return "\n---\n".join(output)
