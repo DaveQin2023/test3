@@ -1,0 +1,19 @@
+import asyncio
+from fastmcp import Client
+
+async def main():
+    client = Client("http://localhost:8000/mcp")
+
+    tools = await client.list_tools()
+
+    print("✅ Tools Available on the MCP Server:\n")
+    for tool in tools:
+        print(f"🛠️ Tool Name: {tool.name}")
+        print(f"📘 Description: {tool.description}")
+        print("🧩 Parameters:")
+        for param in tool.parameters:
+            print(f"   - {param.name}: {param.type} (default: {param.default})")
+        print(f"🏷️ Tags: {tool.tags}")
+        print("-" * 40)
+
+asyncio.run(main())
