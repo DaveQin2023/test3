@@ -1,0 +1,96 @@
+
+from fastapi import FastAPI, Request
+from dotenv import load_dotenv
+from typing import Optional, Any, Callable
+import requests
+import base64
+import os
+
+# Load environment variables from .env
+load_dotenv()
+
+# FastAPI app
+app = FastAPI()
+
+# Confluence credentials from .env
+CONFLUENCE_BASE_URL = os.getenv("CONFLUENCE_BASE_URL")
+USERNAME = os.getenv("USERNAME")
+API_TOKEN = os.getenv("API_TOKEN")
+
+# Tool registry
+tool_registry: dict[str, Callable] = {}
+
+# Tool decorator
+def tool(func):
+    tool_registry[func.__name__] = func
+    return func
+
+# Confluence API request helper
+def make_confluence_request(url: str, method: str = "GET", params: dict = None) -> dict[str, Any] | str:
+    if not USERNAME or not API_TOKEN:
+        return "Error: Please set your Confluence username and API token"
+
+    auth_string = f"{USERNAME}:{API_TOKEN}"
+    base64_auth = base64.b64encode(auth_string.encode("ascii")).decode("ascii")
+
+    headers = {
+        "Authorization": f"Basic {base64_auth}",
+        "Accept": "application/json"
+    }
+
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+        else:
+            response = requests.request(method, url, headers=headers, json=params, timeout=30)
+
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return f"Error making request: {str(e)}"
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
+# Tool: List Confluence spaces
+@tool
+def list_spaces(query: Optional[str] = None, limit: Optional[int] = 25) -> str:
+    url = f"{CONFLUENCE_BASE_URL}/space"
+    params = {
+        "limit": limit,
+        "expand": "description.plain,homepage"
+    }
+    if query:
+        params["spaceKey"] = query
+
+    data = make_confluence_request(url, params=params)
+    if isinstance(data, str):
+        return data
+
+    result = []
+    for space in data.get("results", []):
+        space_info = (
+            f"Space: {space.get('name', 'Unknown')}\n"
+            f"Key: {space.get('key', 'Unknown')}\n"
+            f"Type: {space.get('type', 'Unknown')}\n"
+            f"Description: {space.get('description', {}).get('plain', {}).get('value', 'No description')}"
+        )
+        result.append(space_info)
+
+    return "\n---\n".join(result) if result else "No spaces found"
+
+# Endpoint to receive tool execution requests
+@app.post("/mcp/")
+async def handle_request(request: Request):
+    payload = await request.json()
+    tool_name = payload.get("tool_name")
+    input_args = payload.get("input", {})
+
+    tool_fn = tool_registry.get(tool_name)
+    if not tool_fn:
+        return {"error": f"Tool '{tool_name}' not found"}
+
+    try:
+        result = tool_fn(**input_args)
+        return {"result": result}
+    except Exception as e:
+        return {"error": str(e)}
