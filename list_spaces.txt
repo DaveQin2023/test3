@@ -1,0 +1,18 @@
+import asyncio
+from fastmcp import AsyncClient
+
+async def main():
+    # Connect to FastMCP server
+    client = AsyncClient("http://localhost:8000")
+
+    # Discover available tools
+    tools = await client.list_tools()
+    print(f"\nAvailable tools on server: {[tool.name for tool in tools]}")
+
+    # Call the 'list_spaces' tool with input args
+    print("\nCalling 'list_spaces' tool with limit=3...")
+    result = await client.call_tool("list_spaces", {"limit": 3})
+    print(f"Result of list_spaces(limit=3):\n{result}")
+
+# Run the async main
+asyncio.run(main())
