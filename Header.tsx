@@ -1,0 +1,1 @@
+const Header = () => (<div><h2 className='text-3xl font-semibold'>Welcome, John</h2></div>); export default Header;
